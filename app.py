@@ -68,7 +68,7 @@ async def get_internships(position, experience, city, max_pages=0):
     print(f"Max pages to search: {'All available' if max_pages == 0 else max_pages}")
     
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
+        browser = await p.chromium.launch(headless=True)
         context = await browser.new_context()
         page = await context.new_page()
         
