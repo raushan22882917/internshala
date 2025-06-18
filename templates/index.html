@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Internshala Job Search</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        .search-container {
+            position: relative;
+        }
+        .search-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        .search-input:focus {
+            border-color: #4CAF50;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+        .suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 0 0 6px 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .suggestion-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .suggestion-item:hover {
+            background-color: #f5f5f5;
+        }
+        .suggestion-item.selected {
+            background-color: #e8f5e9;
+        }
+        input[type="number"], input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        input[type="number"]:focus, input[type="text"]:focus {
+            border-color: #4CAF50;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #results {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            display: none;
+        }
+        .selected-position {
+            margin-top: 10px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            border: 2px solid #4CAF50;
+            display: none;
+        }
+        .selected-position h4 {
+            margin: 0 0 8px 0;
+            color: #333;
+            font-size: 16px;
+        }
+        .selected-position p {
+            margin: 0;
+            color: #666;
+            font-size: 14px;
+        }
+        .count-badge {
+            background-color: #4CAF50;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            margin-left: 10px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .job-card {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .job-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .job-link {
+            color: #2196F3;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        .job-link:hover {
+            color: #1976D2;
+            text-decoration: underline;
+        }
+        .download-btn {
+            background-color: #2196F3;
+            margin-top: 20px;
+        }
+        .download-btn:hover {
+            background-color: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Internshala Job Search</h1>
+        <form id="searchForm">
+            <div class="form-group">
+                <label for="position">Position:</label>
+                <div class="search-container">
+                    <input type="text" id="position" class="search-input" placeholder="Type to search positions..." autocomplete="off">
+                    <div id="suggestions" class="suggestions"></div>
+                </div>
+                <div id="selectedPosition" class="selected-position">
+                    <h4>Selected Position:</h4>
+                    <p id="selectedPositionText"></p>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="experience">Experience (years):</label>
+                <input type="number" id="experience" name="experience" min="0" step="1" placeholder="Enter years of experience">
+            </div>
+            <div class="form-group">
+                <label for="city">City:</label>
+                <input type="text" id="city" name="city" placeholder="Enter city name">
+            </div>
+            <div class="form-group">
+                <label for="max_pages">Maximum Pages to Search:</label>
+                <input type="number" id="max_pages" name="max_pages" min="0" value="1">
+            </div>
+            <button type="submit">Search Jobs</button>
+        </form>
+        <div id="results"></div>
+    </div>
+
+    <div id="jobDetails" class="job-details">
+        <div class="job-details-content">
+            <span class="close-details">&times;</span>
+            <div id="jobDetailsContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const positions = [
+            ".NET Development", "3D Printing", "AI Agent Development", "ASP.NET Development",
+            "Accounts", "Acting", "Aerospace Engineering", "Agriculture and Food Engineering",
+            "Analytics", "Anchoring", "Android App Development", "AngularJS Development",
+            "Animation", "Architecture", "Artificial Intelligence (AI)", "Audio Making/Editing",
+            "Auditing", "Automobile Engineering", "Backend Development", "Bank",
+            "Big Data", "Biology", "Biotechnology Engineering", "Blockchain Development",
+            "Blogging", "Brand Management", "Business Development", "Business/MBA",
+            "CA Articleship", "CAD Design", "CS Articleship", "Campus Ambassador",
+            "Chartered Accountancy (CA)", "Chemical Engineering", "Chemistry", "Cinematography",
+            "Civil Engineering", "Client Servicing", "Cloud Computing", "Commerce",
+            "Company Secretary (CS)", "Computer Science", "Computer Vision", "Content Writing",
+            "Copywriting", "Creative Design", "Creative Writing", "Culinary Arts",
+            "Customer Service", "Cyber Security", "Data Entry", "Data Science",
+            "Database Building", "Design", "Dietetics & Nutrition", "Digital Marketing",
+            "E-Commerce", "Editorial", "Electric Vehicle", "Electrical Engineering",
+            "Electronics Engineering", "Embedded Systems", "Energy Science and Engineering",
+            "Engineering", "Engineering Design", "Engineering Physics", "Environmental Sciences",
+            "Event Management", "Facebook Marketing", "Fashion Design", "Film Making",
+            "Finance", "Flutter Development", "Front End Development", "Full Stack Development",
+            "Fundraising", "Game Design", "Game Development", "General Management",
+            "Government", "Graphic Design", "Hospitality", "Hotel Management",
+            "Human Resources (HR)", "Humanities", "Image Processing", "Industrial and Production Engineering",
+            "Industrial Design", "Information Technology", "Instrumentation and Control Engineering",
+            "Interior Design", "International", "Internet of Things (IoT)", "Java Development",
+            "JavaScript Development", "Journalism", "Law", "Legal Research",
+            "MLOps Engineering", "Machine Learning", "Manufacturing Engineering", "Market & Business Research",
+            "Marketing", "Material Science", "Mathematics", "Mathematics and Computing",
+            "Mechanical Engineering", "Mechatronics", "Media", "Medicine",
+            "Merchandise Design", "Mobile App Development", "Motion Graphics", "Music",
+            "NGO", "Natural Language Processing (NLP)", "Network Engineering", "NodeJS Development",
+            "Operations", "PHP Development", "Pharmaceutical", "Photography",
+            "Physics", "Political Economics & Policy Research", "Product Management", "Programming",
+            "Project Management", "Prompt Engineering", "Proofreading", "Psychology",
+            "Public Relations (PR)", "Python/Django Development", "Quality Analyst", "Recruitment",
+            "Robotics", "Ruby on Rails", "Sales", "Science",
+            "Search Engine Optimization (SEO)", "Social Media Marketing", "Social Work", "Software Development",
+            "Software Testing", "Sports", "Statistics", "Stock Market Trading",
+            "Strategy", "Subject Matter Expert (SME)", "Supply Chain Management (SCM)", "Talent Acquisition",
+            "Teaching", "Telecalling", "Transcription", "Translation",
+            "Travel and Tourism", "UI/UX Design", "Video Making/Editing", "Videography",
+            "Volunteering", "Web Development", "WordPress Development", "iOS App Development"
+        ];
+
+        let selectedPosition = '';
+        const $input = document.getElementById('position');
+        const $suggestions = document.getElementById('suggestions');
+        const $selectedPosition = document.getElementById('selectedPosition');
+        const $selectedPositionText = document.getElementById('selectedPositionText');
+
+        $input.addEventListener('input', function() {
+            const value = this.value.toLowerCase();
+            if (value.length < 2) {
+                $suggestions.style.display = 'none';
+                return;
+            }
+
+            const matches = positions.filter(pos => 
+                pos.toLowerCase().includes(value)
+            ).slice(0, 5);
+
+            if (matches.length > 0) {
+                $suggestions.innerHTML = matches.map(match => `
+                    <div class="suggestion-item" data-value="${match}">
+                        ${match}
+                    </div>
+                `).join('');
+                $suggestions.style.display = 'block';
+            } else {
+                $suggestions.style.display = 'none';
+            }
+        });
+
+        $suggestions.addEventListener('click', function(e) {
+            if (e.target.classList.contains('suggestion-item')) {
+                const value = e.target.dataset.value;
+                $input.value = value;
+                selectedPosition = value;
+                $suggestions.style.display = 'none';
+                $selectedPositionText.textContent = value;
+                $selectedPosition.style.display = 'block';
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.search-container')) {
+                $suggestions.style.display = 'none';
+            }
+        });
+
+        $input.addEventListener('focus', function() {
+            if (this.value.length >= 2) {
+                $suggestions.style.display = 'block';
+            }
+        });
+
+        document.getElementById('searchForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            if (!selectedPosition) {
+                alert('Please select a position from the suggestions');
+                return;
+            }
+
+            const formData = new FormData(this);
+            formData.set('position', selectedPosition.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
+            const params = new URLSearchParams(formData);
+            
+            try {
+                const response = await fetch('/search?' + params.toString());
+                const data = await response.json();
+                
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.style.display = 'block';
+                
+                if (data.results && data.results.length > 0) {
+                    let html = `<h2>Search Results <span class="count-badge">${data.results.length} jobs found</span></h2>`;
+                    data.results.forEach((job, index) => {
+                        html += `
+                            <div class="job-card">
+                                <h3>${index + 1}. ${job.position}</h3>
+                                <p><strong>Company:</strong> ${job.company}</p>
+                                <p><strong>Experience:</strong> ${job.experience} years</p>
+                                <p><strong>Skills:</strong> ${job.required_skills.join(', ')}</p>
+                                <p>
+                                    <a href="${job.url}" target="_blank" class="job-link" onclick="showJobDetails(event, '${job.url}')">
+                                        View Job Details
+                                    </a>
+                                </p>
+                            </div>
+                        `;
+                    });
+                    
+                    html += `
+                        <button class="download-btn" onclick="downloadExcel()">
+                            Download Results (${data.results.length} jobs)
+                        </button>
+                    `;
+                    
+                    resultsDiv.innerHTML = html;
+                } else {
+                    resultsDiv.innerHTML = '<p>No results found.</p>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('results').innerHTML = '<p>Error occurred while searching.</p>';
+            }
+        });
+
+        async function showJobDetails(event, url) {
+            event.preventDefault();
+            const detailsContent = document.getElementById('jobDetailsContent');
+            detailsContent.innerHTML = '<p>Loading job details...</p>';
+            document.getElementById('jobDetails').style.display = 'block';
+
+            try {
+                const response = await fetch('/job-details?url=' + encodeURIComponent(url));
+                const data = await response.json();
+                
+                if (data.success) {
+                    detailsContent.innerHTML = `
+                        <h2>${data.position}</h2>
+                        <p><strong>Company:</strong> ${data.company}</p>
+                        <p><strong>Experience:</strong> ${data.experience} years</p>
+                        <p><strong>Required Skills:</strong> ${data.required_skills.join(', ')}</p>
+                        <p><a href="${url}" target="_blank">Open on Internshala</a></p>
+                    `;
+                } else {
+                    detailsContent.innerHTML = '<p>Error loading job details. Please try again.</p>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                detailsContent.innerHTML = '<p>Error loading job details. Please try again.</p>';
+            }
+        }
+
+        async function downloadExcel() {
+            try {
+                const response = await fetch('/download');
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'internships.xlsx';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            } catch (error) {
+                console.error('Error downloading file:', error);
+                alert('Error downloading file. Please try again.');
+            }
+        }
+    </script>
+</body>
+</html>
