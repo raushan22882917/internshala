@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: internshala-scraper
+    env: python
+    buildCommand: |
+      chmod +x setup.sh
+      ./setup.sh
+    startCommand: gunicorn app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    healthCheckPath: /
+    autoDeploy: true
+    plan: free
