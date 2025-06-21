@@ -1,67 +1,58 @@
-# Git files
+# Git
 .git
 .gitignore
-.gitattributes
 
-# Python cache files
+# Python
 __pycache__
 *.pyc
 *.pyo
 *.pyd
 .Python
-*.so
-.pytest_cache
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
 .coverage
-htmlcov
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
 
 # Virtual environments
 venv/
 env/
 ENV/
-.venv/
-.env
 
-# IDE files
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS files
+# OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Logs
-*.log
-logs/
-
-# Temporary files
-*.tmp
-*.temp
+# Docker
+Dockerfile
+.dockerignore
 
 # Documentation
 README.md
 *.md
 
-# Docker files (except Dockerfile)
-docker-compose*.yml
-.dockerignore
-
-# SSL certificates (if any)
-ssl/
-*.pem
-*.key
-*.crt
-
-# Backup files
-*.bak
-*.backup
-
-# Node modules (if any)
-node_modules/
-
-# Build artifacts
-build/
-dist/
-*.egg-info/ 
+# Temporary files
+*.tmp
+*.temp 

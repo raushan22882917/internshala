@@ -4,12 +4,13 @@ FROM python:3.11-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV DEBIAN_FRONTEND=noninteractive
+ENV FLASK_ENV=production
+ENV PORT=8000
 
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies required for Playwright and other packages
+# Install system dependencies required for Playwright
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -23,48 +24,22 @@ RUN apt-get update && apt-get install -y \
     libxkbcommon0 \
     libxcomposite1 \
     libxdamage1 \
+    libxfixes3 \
     libxrandr2 \
     libgbm1 \
     libasound2 \
+    libpango-1.0-0 \
+    libcairo2 \
     libatspi2.0-0 \
     libgtk-3-0 \
-    libx11-xcb1 \
-    libxcb-dri3-0 \
-    libxcb1 \
-    libxss1 \
-    libxtst6 \
-    libxshmfence1 \
-    libglu1-mesa \
-    libgles2-mesa \
-    libegl1-mesa \
-    libdbus-1-3 \
-    libdrm2 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    libatspi2.0-0 \
-    libgtk-3-0 \
-    libx11-xcb1 \
-    libxcb-dri3-0 \
-    libxcb1 \
-    libxss1 \
-    libxtst6 \
-    libxshmfence1 \
-    libglu1-mesa \
-    libgles2-mesa \
-    libegl1-mesa \
-    libdbus-1-3 \
-    fonts-liberation \
+    libgdk-pixbuf2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Install Playwright browsers
 RUN playwright install chromium
@@ -76,17 +51,17 @@ COPY . .
 # Create downloads directory
 RUN mkdir -p downloads
 
-# Create a non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-RUN chown -R appuser:appuser /app
-USER appuser
+# Create non-root user for security
+RUN useradd --create-home --shell /bin/bash app \
+    && chown -R app:app /app
+USER app
 
 # Expose port
 EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/ || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the application
 CMD ["python", "app.py"] 

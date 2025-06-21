@@ -3,50 +3,17 @@ version: '3.8'
 services:
   internshala-scraper:
     build: .
-    container_name: internshala-scraper
     ports:
       - "8000:8000"
-    volumes:
-      - ./downloads:/app/downloads
-      - ./logs:/app/logs
     environment:
       - FLASK_ENV=production
-      - FLASK_DEBUG=0
-      - PYTHONUNBUFFERED=1
+      - PORT=8000
+    volumes:
+      - ./downloads:/app/downloads
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-    networks:
-      - internshala-network
-
-  # Optional: Add a reverse proxy with Nginx for production
-  nginx:
-    image: nginx:alpine
-    container_name: internshala-nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - internshala-scraper
-    restart: unless-stopped
-    networks:
-      - internshala-network
-    profiles:
-      - production
-
-networks:
-  internshala-network:
-    driver: bridge
-
-volumes:
-  downloads:
-    driver: local
-  logs:
-    driver: local 
+      start_period: 40s 
