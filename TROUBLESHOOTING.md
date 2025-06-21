@@ -187,4 +187,197 @@ Before deploying, ensure:
 - [ ] Health check endpoint working
 - [ ] All dependencies listed in requirements.txt
 - [ ] Build script executable
-- [ ] Environment variables set correctly 
+- [ ] Environment variables set correctly
+
+# Troubleshooting Guide for Render Deployment
+
+## Issue: Playwright Authentication Failure
+
+### Problem
+```
+🔧 Installing Playwright system dependencies...
+Installing dependencies...
+Switching to root user to install dependencies...
+Password: su: Authentication failure
+Failed to install browser dependencies
+Error: Installation process exited with code: 1
+```
+
+### Root Cause
+Render's build environment doesn't allow switching to root user with `su`, which Playwright's `install-deps` command requires.
+
+### Solutions
+
+#### Solution 1: Use Modified Build Script (Recommended)
+The `build.sh` file has been updated to use the `--with-deps` flag instead of separate `install-deps` command:
+
+```bash
+# Instead of:
+python -m playwright install-deps chromium
+
+# Use:
+python -m playwright install chromium --with-deps
+```
+
+#### Solution 2: Use Selenium Alternative
+If Playwright continues to cause issues, use the Selenium-based alternative:
+
+1. **Files to use:**
+   - `app_alternative.py` (Selenium-based app)
+   - `requirements_alternative.txt` (Selenium dependencies)
+   - `build_alternative.sh` (Selenium build script)
+   - `render_alternative.yaml` (Alternative render config)
+
+2. **Deploy with alternative configuration:**
+   ```bash
+   # Use the alternative render configuration
+   render deploy --config render_alternative.yaml
+   ```
+
+#### Solution 3: Use Docker Deployment
+If web service deployment fails, use Docker:
+
+1. **Use the existing Dockerfile** which properly handles Playwright installation
+2. **Deploy as a Docker service** on Render
+
+### Alternative Dependencies
+
+#### Playwright Dependencies (Original)
+```
+flask
+requests
+beautifulsoup4
+numpy
+pandas
+openpyxl
+lxml
+playwright
+gunicorn
+```
+
+#### Selenium Dependencies (Alternative)
+```
+flask
+requests
+beautifulsoup4
+numpy
+pandas
+openpyxl
+lxml
+selenium
+webdriver-manager
+gunicorn
+```
+
+### Build Scripts Comparison
+
+#### Original Build Script (build.sh)
+```bash
+#!/bin/bash
+set -e
+echo "🚀 Starting build process..."
+pip install --upgrade pip setuptools wheel
+pip install -r requirements.txt
+python -c "import playwright; print('Playwright imported successfully')"
+python -m playwright install chromium
+python -m playwright install chromium --with-deps  # Modified line
+echo "✅ Build completed successfully!"
+```
+
+#### Alternative Build Script (build_alternative.sh)
+```bash
+#!/bin/bash
+set -e
+echo "🚀 Starting alternative build process with Selenium..."
+pip install --upgrade pip setuptools wheel
+pip install -r requirements_alternative.txt
+python -c "import selenium; print('Selenium imported successfully')"
+# Install Chrome dependencies directly
+apt-get update && apt-get install -y [chrome-dependencies]
+echo "✅ Alternative build completed successfully!"
+```
+
+### Render Configuration Files
+
+#### Original (render.yaml)
+```yaml
+services:
+  - type: web
+    name: internshala-scraper
+    env: python
+    pythonVersion: "3.11"
+    buildCommand: chmod +x build.sh && ./build.sh
+    startCommand: python app.py
+    # ... other config
+```
+
+#### Alternative (render_alternative.yaml)
+```yaml
+services:
+  - type: web
+    name: internshala-scraper-alternative
+    env: python
+    pythonVersion: "3.11"
+    buildCommand: chmod +x build_alternative.sh && ./build_alternative.sh
+    startCommand: python app_alternative.py
+    # ... other config
+```
+
+### Testing Locally
+
+#### Test Playwright Version
+```bash
+pip install -r requirements.txt
+python -m playwright install chromium --with-deps
+python app.py
+```
+
+#### Test Selenium Version
+```bash
+pip install -r requirements_alternative.txt
+python app_alternative.py
+```
+
+### Common Issues and Fixes
+
+1. **Permission Denied Errors**
+   - Use the modified build script with `--with-deps`
+   - Or switch to Selenium alternative
+
+2. **Browser Installation Failures**
+   - Ensure all system dependencies are installed
+   - Use headless mode for production
+
+3. **Memory Issues**
+   - Reduce number of concurrent browser instances
+   - Implement proper cleanup in the code
+
+4. **Timeout Issues**
+   - Increase timeout values in render.yaml
+   - Implement proper error handling
+
+### Performance Considerations
+
+#### Playwright Advantages
+- Better performance for complex web scraping
+- Built-in waiting mechanisms
+- Better handling of modern web applications
+
+#### Selenium Advantages
+- More stable on Render
+- Better compatibility with older systems
+- Easier to debug
+
+### Recommended Approach
+
+1. **First try:** Use the modified `build.sh` with `--with-deps` flag
+2. **If that fails:** Switch to Selenium alternative
+3. **For production:** Consider Docker deployment for better control
+
+### Support
+
+If you continue to experience issues:
+1. Check Render's build logs for specific error messages
+2. Verify all dependencies are correctly specified
+3. Test the application locally before deploying
+4. Consider using Render's Docker service instead of web service 

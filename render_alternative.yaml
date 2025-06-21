@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: internshala-scraper-alternative
+    env: python
+    pythonVersion: "3.11"
+    buildCommand: chmod +x build_alternative.sh && ./build_alternative.sh
+    startCommand: python app_alternative.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 8000
+      - key: PYTHONUNBUFFERED
+        value: 1
+    healthCheckPath: /health
+    autoDeploy: true
+    plan: free 

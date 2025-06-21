@@ -22,8 +22,9 @@ python -c "import playwright; print('Playwright imported successfully')"
 echo "🌐 Installing Playwright browsers..."
 python -m playwright install chromium
 
-# Install Playwright dependencies
+# Install Playwright dependencies without root privileges
 echo "🔧 Installing Playwright system dependencies..."
-python -m playwright install-deps chromium
+# Use the --with-deps flag to install dependencies during browser installation
+python -m playwright install chromium --with-deps
 
 echo "✅ Build completed successfully!" 

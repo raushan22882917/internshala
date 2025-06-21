@@ -1,7 +1,10 @@
-flask==3.0.0
-requests==2.31.0
-beautifulsoup4==4.12.2
-openpyxl==3.1.2
-lxml==4.9.3
-playwright==1.40.0
-gunicorn==21.2.0 
+flask
+requests
+beautifulsoup4
+numpy
+pandas
+openpyxl
+lxml
+selenium
+webdriver-manager
+gunicorn 
