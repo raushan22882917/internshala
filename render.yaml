@@ -2,6 +2,7 @@ services:
   - type: web
     name: internshala-scraper
     env: python
+    pythonVersion: "3.11"
     buildCommand: chmod +x build.sh && ./build.sh
     startCommand: python app.py
     envVars:
