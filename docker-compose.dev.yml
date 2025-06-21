@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  internshala-scraper:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: internshala-scraper-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./downloads:/app/downloads
+      - ./logs:/app/logs
+      - .:/app  # Mount source code for development
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    restart: unless-stopped
+    command: ["python", "-u", "app.py"]
+    networks:
+      - internshala-network
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: internshala-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - internshala-network
+
+  # PostgreSQL for data storage (optional)
+  postgres:
+    image: postgres:15-alpine
+    container_name: internshala-postgres
+    environment:
+      POSTGRES_DB: internshala
+      POSTGRES_USER: internshala_user
+      POSTGRES_PASSWORD: internshala_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - internshala-network
+
+  # pgAdmin for database management (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: internshala-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@internshala.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - internshala-network
+
+networks:
+  internshala-network:
+    driver: bridge
+
+volumes:
+  downloads:
+    driver: local
+  logs:
+    driver: local
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local 

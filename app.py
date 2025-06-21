@@ -6,8 +6,6 @@ import os
 import json
 from flask import Flask, render_template, request, jsonify, send_file
 import threading
-import io
-from datetime import datetime
 
 app = Flask(__name__)
 
@@ -68,7 +66,7 @@ async def get_internships(position, experience, city, max_pages=0):
     print(f"Max pages to search: {'All available' if max_pages == 0 else max_pages}")
     
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
+        browser = await p.chromium.launch(headless=True)
         context = await browser.new_context()
         page = await context.new_page()
         
@@ -189,10 +187,6 @@ async def get_internships(position, experience, city, max_pages=0):
                     consecutive_empty_pages += 1
                     current_page += 1
             
-            # Keep browser open for one minute after data collection
-            print("\nKeeping browser open for 1 minute to view results...")
-            await asyncio.sleep(60)
-            
         finally:
             # Make sure to close the browser even if there's an error
             await browser.close()
@@ -227,24 +221,13 @@ def search():
     # Run the search
     results = run_search()
     
-    # Create Excel file in memory
+    # Save results to Excel
     if results:
+        downloads_dir = "downloads"
+        os.makedirs(downloads_dir, exist_ok=True)
         df = pd.DataFrame(results)
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False)
-        output.seek(0)
-        
-        # Generate filename with timestamp
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"internships_{position}_{city}_{timestamp}.xlsx"
-        
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=filename
-        )
+        excel_filename = os.path.join(downloads_dir, f"internships_{position}_{city}.xlsx")
+        df.to_excel(excel_filename, index=False)
     
     return jsonify({'results': results})
 
@@ -273,5 +256,50 @@ def job_details():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/download')
+def download():
+    # Get the latest Excel file from downloads directory
+    downloads_dir = "downloads"
+    excel_files = [f for f in os.listdir(downloads_dir) if f.endswith('.xlsx')]
+    if excel_files:
+        latest_file = max([os.path.join(downloads_dir, f) for f in excel_files], key=os.path.getctime)
+        return send_file(latest_file, as_attachment=True, download_name='internships.xlsx')
+    return jsonify({'error': 'No Excel file found'}), 404
+
+@app.route('/health')
+def health():
+    return jsonify({'status': 'healthy', 'message': 'Internshala Scraper is running'})
+
 if __name__ == "__main__":
-    app.run(debug=True, port=8000)
+    # Get port from environment variable (for Render) or use default
+    port = int(os.environ.get('PORT', 8000))
+    
+    # Use production server in production environment
+    if os.environ.get('FLASK_ENV') == 'production':
+        from gunicorn.app.base import BaseApplication
+        
+        class StandaloneApplication(BaseApplication):
+            def __init__(self, app, options=None):
+                self.options = options or {}
+                self.application = app
+                super().__init__()
+
+            def load_config(self):
+                for key, value in self.options.items():
+                    self.cfg.set(key, value)
+
+            def load(self):
+                return self.application
+
+        options = {
+            'bind': f'0.0.0.0:{port}',
+            'workers': 1,  # Single worker for Playwright
+            'worker_class': 'sync',
+            'timeout': 300,
+            'keepalive': 2,
+        }
+        
+        StandaloneApplication(app, options).run()
+    else:
+        # Development server
+        app.run(debug=True, host='0.0.0.0', port=port)
