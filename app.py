@@ -387,9 +387,7 @@ def get_jobs(position, experience, city, max_pages=1):
     
     return all_data, pages_processed
 
-# @app.get('/')
-# def index():
-#     return FileResponse('index.html')
+
 
 @app.get('/search')
 def search(
