@@ -395,8 +395,15 @@ def search():
         position = request.args.get('position', '')
         experience = request.args.get('experience', '')
         city = request.args.get('city', '')
-        max_pages = int(request.args.get('max_pages', '1'))
+        
+        try:
+            max_pages = int(request.args.get('max_pages', '1'))
+        except ValueError:
+            return jsonify({'error': 'Invalid max_pages value'}), 400
+            
         search_type = request.args.get('searchType', 'internship')
+        
+        print("Search parameters:", position, experience, city, max_pages, search_type)
         
         # Run the appropriate search based on type
         if search_type == 'job':
