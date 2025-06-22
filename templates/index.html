@@ -695,17 +695,21 @@
                 return;
             }
 
-            const formData = new FormData(this);
-            
-            // Use the position mapping to get the correct backend format
             const mappedPosition = positionMapping[selectedPosition];
             if (!mappedPosition) {
                 showError('Invalid position selected. Please try again.');
                 return;
             }
+
+            const searchParams = {
+                searchType: document.getElementById('searchType').value,
+                position: mappedPosition,
+                experience: document.getElementById('experience').value,
+                city: document.getElementById('city').value,
+                max_pages: document.getElementById('max_pages').value,
+            };
             
-            formData.set('position', mappedPosition);
-            const params = new URLSearchParams(formData);
+            const params = new URLSearchParams(searchParams);
             
             // Show loading state
             const resultsDiv = document.getElementById('results');
