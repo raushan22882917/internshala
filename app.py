@@ -4,12 +4,14 @@ import pandas as pd
 import re
 import os
 import json
-from flask import Flask, render_template, request, jsonify, send_file
+from fastapi import FastAPI, Query
+from fastapi.responses import JSONResponse, FileResponse
 import time
 import random
-import traceback
+import uvicorn
+from typing import Optional
 
-app = Flask(__name__)
+app = FastAPI()
 
 def get_job_details(url):
     """Fetch job details using BeautifulSoup"""
@@ -385,132 +387,87 @@ def get_jobs(position, experience, city, max_pages=1):
     
     return all_data, pages_processed
 
-@app.route('/')
+@app.get('/')
 def index():
-    return render_template('index.html')
+    return FileResponse('index.html')
 
-@app.route('/search')
-def search():
-    try:
-        # Get parameters from request
-        position = request.args.get('position', '')
-        experience = request.args.get('experience', '')
-        city = request.args.get('city', '')
-        
-        try:
-            max_pages = int(request.args.get('max_pages', '1'))
-        except ValueError:
-            return jsonify({'error': 'Invalid max_pages value'}), 400
-            
-        search_type = request.args.get('searchType', 'internship')
-        
-        print("Search parameters:", position, experience, city, max_pages, search_type)
-        
-        # Run the appropriate search based on type
-        if search_type == 'job':
-            results, pages_processed = get_jobs(position, experience, city, max_pages)
-        else:
-            results, pages_processed = get_internships(position, experience, city, max_pages)
-        
-        # Save results to Excel
-        if results:
-            try:
-                downloads_dir = "downloads"
-                os.makedirs(downloads_dir, exist_ok=True)
-                df = pd.DataFrame(results)
-                
-                # Create filename with search parameters
-                filename_parts = []
-                if position:
-                    filename_parts.append(position)
-                if city:
-                    filename_parts.append(city)
-                if not filename_parts:
-                    filename_parts.append("all")
-                
-                excel_filename = os.path.join(downloads_dir, f"{search_type}_{'_'.join(filename_parts)}.xlsx")
-                df.to_excel(excel_filename, index=False)
-            except Exception as e:
-                print(f"Error saving Excel file: {e}")
-                traceback.print_exc()
-        
-        return jsonify({
-            'results': results,
-            'pages_processed': pages_processed,
-            'search_params': {
-                'position': position,
-                'experience': experience,
-                'city': city,
-                'max_pages': max_pages,
-                'search_type': search_type
-            }
-        })
-    except Exception as e:
-        print(f"An error occurred during search: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/job-details')
-def job_details():
-    job_url = request.args.get('url', '')
+@app.get('/search')
+def search(
+    position: Optional[str] = Query(None),
+    experience: Optional[str] = Query(None),
+    city: Optional[str] = Query(None),
+    max_pages: int = Query(1),
+    search_type: str = Query('internship', enum=['internship', 'job'])
+):
+    # Run the appropriate search based on type
+    if search_type == 'job':
+        results, pages_processed = get_jobs(position, experience, city, max_pages)
+    else:
+        results, pages_processed = get_internships(position, experience, city, max_pages)
     
-    if not job_url:
-        return jsonify({'error': 'Missing job URL'}), 400
+    # Save results to Excel
+    if results:
+        downloads_dir = "downloads"
+        os.makedirs(downloads_dir, exist_ok=True)
+        df = pd.DataFrame(results)
+        
+        # Create filename with search parameters
+        filename_parts = []
+        if position:
+            filename_parts.append(position)
+        if city:
+            filename_parts.append(city)
+        if not filename_parts:
+            filename_parts.append("all")
+        
+        excel_filename = os.path.join(downloads_dir, f"{search_type}_{'_'.join(filename_parts)}.xlsx")
+        df.to_excel(excel_filename, index=False)
+    
+    return {
+        'results': results,
+        'pages_processed': pages_processed,
+        'search_params': {
+            'position': position,
+            'experience': experience,
+            'city': city,
+            'max_pages': max_pages,
+            'search_type': search_type
+        }
+    }
+
+@app.get('/job-details')
+def job_details(url: str = Query(...)):
+    if not url:
+        return JSONResponse(content={'error': 'Missing job URL'}, status_code=400)
     
     try:
-        details = get_job_details(job_url)
+        details = get_job_details(url)
         
-        return jsonify({
+        return {
             'success': True,
             'required_skills': details.get('required_skills', [])
-        })
+        }
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return JSONResponse(content={'error': str(e)}, status_code=500)
 
-@app.route('/download')
+@app.get('/download')
 def download():
     # Get the latest Excel file from downloads directory
     downloads_dir = "downloads"
+    if not os.path.exists(downloads_dir):
+        return JSONResponse(content={'error': 'Downloads directory not found'}, status_code=404)
+        
     excel_files = [f for f in os.listdir(downloads_dir) if f.endswith('.xlsx')]
     if excel_files:
         latest_file = max([os.path.join(downloads_dir, f) for f in excel_files], key=os.path.getctime)
-        return send_file(latest_file, as_attachment=True, download_name='results.xlsx')
-    return jsonify({'error': 'No Excel file found'}), 404
+        return FileResponse(latest_file, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', filename='results.xlsx')
+    return JSONResponse(content={'error': 'No Excel file found'}, status_code=404)
 
-@app.route('/health')
+@app.get('/health')
 def health():
-    return jsonify({'status': 'healthy', 'message': 'Internshala Scraper is running'})
+    return {'status': 'healthy', 'message': 'Internshala Scraper is running'}
 
 if __name__ == "__main__":
-    # Get port from environment variable (for Render) or use default
+    # Get port from environment variable or use default
     port = int(os.environ.get('PORT', 8000))
-    
-    # Use production server in production environment
-    if os.environ.get('FLASK_ENV') == 'production':
-        from gunicorn.app.base import BaseApplication
-        
-        class StandaloneApplication(BaseApplication):
-            def __init__(self, app, options=None):
-                self.options = options or {}
-                self.application = app
-                super().__init__()
-
-            def load_config(self):
-                for key, value in self.options.items():
-                    self.cfg.set(key, value)
-
-            def load(self):
-                return self.application
-
-        options = {
-            'bind': f'0.0.0.0:{port}',
-            'workers': 1,
-            'worker_class': 'sync',
-            'timeout': 300,
-            'keepalive': 2,
-        }
-        
-        StandaloneApplication(app, options).run()
-    else:
-        # Development server
-        app.run(debug=True, host='0.0.0.0', port=port)
+    uvicorn.run("app:app", host='0.0.0.0', port=port, reload=True)

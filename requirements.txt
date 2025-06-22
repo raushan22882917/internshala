@@ -1,7 +1,7 @@
-flask
+fastapi
+uvicorn[standard]
+jinja2
 beautifulsoup4
-requests
 pandas
-openpyxl
-gunicorn
-lxml
+requests
+python-multipart

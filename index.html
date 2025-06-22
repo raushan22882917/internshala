@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internshala Scraper</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="text"], input[type="number"], select {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .radio-group {
+            margin-bottom: 15px;
+        }
+        .radio-group label {
+            margin-right: 15px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none; /* Hidden by default */
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Internshala Scraper</h1>
+        <form id="search-form">
+            <div class="form-group">
+                <label for="position">Position</label>
+                <input type="text" id="position" name="position" placeholder="e.g., python developer">
+            </div>
+            <div class="form-group">
+                <label for="city">City</label>
+                <input type="text" id="city" name="city" placeholder="e.g., mumbai">
+            </div>
+            <div class="form-group">
+                <label for="max_pages">Max Pages to Scrape</label>
+                <input type="number" id="max_pages" name="max_pages" value="1" min="1">
+            </div>
+            <div class="radio-group">
+                <label>Search Type:</label>
+                <input type="radio" id="internship" name="search_type" value="internship" checked>
+                <label for="internship">Internship</label>
+                <input type="radio" id="job" name="search_type" value="job">
+                <label for="job">Job</label>
+            </div>
+            <button type="submit" id="search-btn">Search and Scrape</button>
+        </form>
+        <div class="loader" id="loader"></div>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        document.getElementById('search-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const form = event.target;
+            const position = form.elements.position.value;
+            const city = form.elements.city.value;
+            const max_pages = form.elements.max_pages.value;
+            const search_type = form.elements.search_type.value;
+
+            const searchBtn = document.getElementById('search-btn');
+            const loader = document.getElementById('loader');
+            const resultsDiv = document.getElementById('results');
+
+            resultsDiv.innerHTML = '';
+            searchBtn.disabled = true;
+            searchBtn.textContent = 'Scraping...';
+            loader.style.display = 'block';
+
+            const params = new URLSearchParams({
+                max_pages,
+                search_type
+            });
+            if (position) params.append('position', position);
+            if (city) params.append('city', city);
+
+            fetch(`/search?${params.toString()}`)
+                .then(response => response.json())
+                .then(data => {
+                    loader.style.display = 'none';
+                    searchBtn.disabled = false;
+                    searchBtn.textContent = 'Search and Scrape';
+
+                    let resultHTML = `
+                        <h3>Scraping Complete!</h3>
+                        <p>Pages Processed: ${data.pages_processed}</p>
+                        <p>Total Results Found: ${data.results.length}</p>
+                    `;
+
+                    if (data.results.length > 0) {
+                        resultHTML += '<a href="/download" download="internship_data.xlsx"><button>Download Excel File</button></a>';
+                    }
+
+                    resultsDiv.innerHTML = resultHTML;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    loader.style.display = 'none';
+                    searchBtn.disabled = false;
+                    searchBtn.textContent = 'Search and Scrape';
+                    resultsDiv.innerHTML = `<p style="color:red;">An error occurred. Please check the console.</p>`;
+                });
+        });
+    </script>
+</body>
+</html> 
