@@ -7,6 +7,7 @@ import json
 from flask import Flask, render_template, request, jsonify, send_file
 import time
 import random
+import traceback
 
 app = Flask(__name__)
 
@@ -413,21 +414,25 @@ def search():
         
         # Save results to Excel
         if results:
-            downloads_dir = "downloads"
-            os.makedirs(downloads_dir, exist_ok=True)
-            df = pd.DataFrame(results)
-            
-            # Create filename with search parameters
-            filename_parts = []
-            if position:
-                filename_parts.append(position)
-            if city:
-                filename_parts.append(city)
-            if not filename_parts:
-                filename_parts.append("all")
-            
-            excel_filename = os.path.join(downloads_dir, f"{search_type}_{'_'.join(filename_parts)}.xlsx")
-            df.to_excel(excel_filename, index=False)
+            try:
+                downloads_dir = "downloads"
+                os.makedirs(downloads_dir, exist_ok=True)
+                df = pd.DataFrame(results)
+                
+                # Create filename with search parameters
+                filename_parts = []
+                if position:
+                    filename_parts.append(position)
+                if city:
+                    filename_parts.append(city)
+                if not filename_parts:
+                    filename_parts.append("all")
+                
+                excel_filename = os.path.join(downloads_dir, f"{search_type}_{'_'.join(filename_parts)}.xlsx")
+                df.to_excel(excel_filename, index=False)
+            except Exception as e:
+                print(f"Error saving Excel file: {e}")
+                traceback.print_exc()
         
         return jsonify({
             'results': results,
@@ -442,6 +447,7 @@ def search():
         })
     except Exception as e:
         print(f"An error occurred during search: {e}")
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/job-details')
