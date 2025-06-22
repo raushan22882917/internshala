@@ -5,11 +5,12 @@ import re
 import os
 import json
 from fastapi import FastAPI, Query
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, Response
 import time
 import random
 import uvicorn
 from typing import Optional
+import io
 
 app = FastAPI()
 
@@ -387,8 +388,6 @@ def get_jobs(position, experience, city, max_pages=1):
     
     return all_data, pages_processed
 
-
-
 @app.get('/search')
 def search(
     position: Optional[str] = Query(None),
@@ -402,24 +401,6 @@ def search(
         results, pages_processed = get_jobs(position, experience, city, max_pages)
     else:
         results, pages_processed = get_internships(position, experience, city, max_pages)
-    
-    # Save results to Excel
-    if results:
-        downloads_dir = "downloads"
-        os.makedirs(downloads_dir, exist_ok=True)
-        df = pd.DataFrame(results)
-        
-        # Create filename with search parameters
-        filename_parts = []
-        if position:
-            filename_parts.append(position)
-        if city:
-            filename_parts.append(city)
-        if not filename_parts:
-            filename_parts.append("all")
-        
-        excel_filename = os.path.join(downloads_dir, f"{search_type}_{'_'.join(filename_parts)}.xlsx")
-        df.to_excel(excel_filename, index=False)
     
     return {
         'results': results,
@@ -448,18 +429,49 @@ def job_details(url: str = Query(...)):
     except Exception as e:
         return JSONResponse(content={'error': str(e)}, status_code=500)
 
-@app.get('/download')
-def download():
-    # Get the latest Excel file from downloads directory
-    downloads_dir = "downloads"
-    if not os.path.exists(downloads_dir):
-        return JSONResponse(content={'error': 'Downloads directory not found'}, status_code=404)
-        
-    excel_files = [f for f in os.listdir(downloads_dir) if f.endswith('.xlsx')]
-    if excel_files:
-        latest_file = max([os.path.join(downloads_dir, f) for f in excel_files], key=os.path.getctime)
-        return FileResponse(latest_file, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', filename='results.xlsx')
-    return JSONResponse(content={'error': 'No Excel file found'}, status_code=404)
+@app.get('/download_excel')
+def download_excel(
+    position: Optional[str] = Query(None),
+    experience: Optional[str] = Query(None),
+    city: Optional[str] = Query(None),
+    max_pages: int = Query(1),
+    search_type: str = Query('internship', enum=['internship', 'job'])
+):
+    # Run the appropriate search based on type
+    if search_type == 'job':
+        results, _ = get_jobs(position, experience, city, max_pages)
+    else:
+        results, _ = get_internships(position, experience, city, max_pages)
+    
+    if not results:
+        return JSONResponse(content={'error': 'No results to download for the given criteria'}, status_code=404)
+
+    df = pd.DataFrame(results)
+    
+    # Create filename with search parameters
+    filename_parts = []
+    if position:
+        filename_parts.append(position)
+    if city:
+        filename_parts.append(city)
+    if not filename_parts:
+        filename_parts.append("all")
+    
+    excel_filename = f"{search_type}_{'_'.join(filename_parts)}.xlsx"
+
+    output = io.BytesIO()
+    df.to_excel(output, index=False)
+    output.seek(0)
+
+    headers = {
+        'Content-Disposition': f'attachment; filename="{excel_filename}"'
+    }
+    
+    return Response(
+        content=output.getvalue(), 
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers=headers
+    )
 
 @app.get('/health')
 def health():
