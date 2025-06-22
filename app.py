@@ -7,7 +7,6 @@ import json
 from flask import Flask, render_template, request, jsonify, send_file
 import time
 import random
-import traceback
 
 app = Flask(__name__)
 
@@ -79,9 +78,9 @@ def get_internships(position, experience, city, max_pages=1):
             break
             
         try:
-            # Add page parameter to URL for subsequent pages
-            if current_page > 1:
-                page_url = f"{url.rstrip('/')}/page-{current_page}/"
+            # Add page parameter to URL only if max_pages is specified
+            if max_pages > 0 and current_page > 1:
+                page_url = f"{url}page-{current_page}/"
             else:
                 page_url = url
                 
@@ -121,16 +120,12 @@ def get_internships(position, experience, city, max_pages=1):
             for internship in internships:
                 try:
                     # Position
-                    position_heading = internship.find("h3", class_="job-internship-name")
-                    if not position_heading:
+                    position_tag = internship.find("a", id="job_title")
+                    if not position_tag:
                         continue
-                    
-                    position_text = position_heading.get_text(strip=True)
-
-                    position_link_tag = position_heading.find_parent("a")
-                    job_url = None
-                    if position_link_tag and position_link_tag.get("href"):
-                        job_url = base_url + position_link_tag.get("href")
+                        
+                    position_text = position_tag.get_text(strip=True)
+                    job_url = base_url + position_tag.get("href") if position_tag.get("href") else None
                     
                     # Skip if no URL or if we've seen this URL before
                     if not job_url or job_url in seen_urls:
@@ -183,6 +178,11 @@ def get_internships(position, experience, city, max_pages=1):
                 print(f"No valid jobs found on page {current_page}. Stopping search.")
                 break
             
+            # If max_pages is 0, only fetch first page
+            if max_pages == 0:
+                print("No page count specified. Only fetching first page.")
+                break
+                
             current_page += 1
             
         except Exception as e:
@@ -233,9 +233,9 @@ def get_jobs(position, experience, city, max_pages=1):
             break
             
         try:
-            # Add page parameter to URL for subsequent pages
-            if current_page > 1:
-                page_url = f"{url.rstrip('/')}/page-{current_page}/"
+            # Add page parameter to URL only if max_pages is specified
+            if max_pages > 0 and current_page > 1:
+                page_url = f"{url}page-{current_page}/"
             else:
                 page_url = url
                 
@@ -365,6 +365,11 @@ def get_jobs(position, experience, city, max_pages=1):
                 print(f"No valid jobs found on page {current_page}. Stopping search.")
                 break
             
+            # If max_pages is 0, only fetch first page
+            if max_pages == 0:
+                print("No page count specified. Only fetching first page.")
+                break
+                
             current_page += 1
             
         except Exception as e:
@@ -436,7 +441,6 @@ def search():
             }
         })
     except Exception as e:
-        traceback.print_exc()
         print(f"An error occurred during search: {e}")
         return jsonify({'error': str(e)}), 500
 
