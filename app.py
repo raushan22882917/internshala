@@ -5,7 +5,7 @@ import re
 import os
 import json
 from fastapi import FastAPI, Query
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, Response
 import time
 import random
 import uvicorn
@@ -391,6 +391,10 @@ def get_jobs(position, experience, city, max_pages=1):
 def index():
     return FileResponse('index.html')
 
+@app.get('/favicon.ico', include_in_schema=False)
+async def favicon():
+    return Response(status_code=204)
+
 @app.get('/search')
 def search(
     position: Optional[str] = Query(None),
@@ -399,41 +403,48 @@ def search(
     max_pages: int = Query(1),
     search_type: str = Query('internship', enum=['internship', 'job'])
 ):
-    # Run the appropriate search based on type
-    if search_type == 'job':
-        results, pages_processed = get_jobs(position, experience, city, max_pages)
-    else:
-        results, pages_processed = get_internships(position, experience, city, max_pages)
-    
-    # Save results to Excel
-    if results:
-        downloads_dir = "downloads"
-        os.makedirs(downloads_dir, exist_ok=True)
-        df = pd.DataFrame(results)
+    try:
+        # Run the appropriate search based on type
+        if search_type == 'job':
+            results, pages_processed = get_jobs(position, experience, city, max_pages)
+        else:
+            results, pages_processed = get_internships(position, experience, city, max_pages)
         
-        # Create filename with search parameters
-        filename_parts = []
-        if position:
-            filename_parts.append(position)
-        if city:
-            filename_parts.append(city)
-        if not filename_parts:
-            filename_parts.append("all")
+        # Save results to Excel
+        if results:
+            downloads_dir = "downloads"
+            os.makedirs(downloads_dir, exist_ok=True)
+            df = pd.DataFrame(results)
+            
+            # Create filename with search parameters
+            filename_parts = []
+            if position:
+                filename_parts.append(position.replace(" ", "_"))
+            if city:
+                filename_parts.append(city.replace(" ", "_"))
+            if not filename_parts:
+                filename_parts.append("all")
+            
+            excel_filename = os.path.join(downloads_dir, f"{search_type}_{'_'.join(filename_parts)}.xlsx")
+            df.to_excel(excel_filename, index=False)
         
-        excel_filename = os.path.join(downloads_dir, f"{search_type}_{'_'.join(filename_parts)}.xlsx")
-        df.to_excel(excel_filename, index=False)
-    
-    return {
-        'results': results,
-        'pages_processed': pages_processed,
-        'search_params': {
-            'position': position,
-            'experience': experience,
-            'city': city,
-            'max_pages': max_pages,
-            'search_type': search_type
+        return {
+            'results': results,
+            'pages_processed': pages_processed,
+            'search_params': {
+                'position': position,
+                'experience': experience,
+                'city': city,
+                'max_pages': max_pages,
+                'search_type': search_type
+            }
         }
-    }
+    except Exception as e:
+        print(f"An error occurred during scraping: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={'error': 'Scraping failed. The target website might be blocking our server or its layout may have changed. Please try again later.'}
+        )
 
 @app.get('/job-details')
 def job_details(url: str = Query(...)):
