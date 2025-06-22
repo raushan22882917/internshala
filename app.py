@@ -11,8 +11,17 @@ import random
 import uvicorn
 from typing import Optional
 import io
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins universally
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def get_job_details(url):
     """Fetch job details using BeautifulSoup"""
