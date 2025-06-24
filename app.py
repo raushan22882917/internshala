@@ -36,19 +36,43 @@ def get_job_details(url):
         
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # Get required skills
-        skills_container = soup.find("div", class_="round_tabs_container")
         required_skills = []
-        
+
+        # Method 1: Find by id 'skills-container'
+        skills_container = soup.find(id="skills-container")
         if skills_container:
-            skill_tags = skills_container.find_all("span", class_="round_tabs")
+            skill_tags = skills_container.find_all(class_="skill") # Or other tag
+            if not skill_tags:
+                 skill_tags = skills_container.find_all("span") # fallback
             for skill in skill_tags:
                 skill_text = skill.get_text(strip=True)
                 if skill_text:
                     required_skills.append(skill_text)
         
+        # Method 2: Find by heading
+        if not required_skills:
+            skills_heading = soup.find("h4", string=re.compile(r"Skill\(s\)\srequired", re.I))
+            if skills_heading:
+                skills_div = skills_heading.find_next_sibling("div")
+                if skills_div:
+                    skill_tags = skills_div.find_all("span", class_="round_tabs")
+                    for skill in skill_tags:
+                        skill_text = skill.get_text(strip=True)
+                        if skill_text:
+                            required_skills.append(skill_text)
+
+        # Method 3: Original implementation as fallback
+        if not required_skills:
+            skills_container = soup.find("div", class_="round_tabs_container")
+            if skills_container:
+                skill_tags = skills_container.find_all("span", class_="round_tabs")
+                for skill in skill_tags:
+                    skill_text = skill.get_text(strip=True)
+                    if skill_text:
+                        required_skills.append(skill_text)
+        
         return {
-            "required_skills": required_skills
+            "required_skills": list(set(required_skills)) # Remove duplicates
         }
     except Exception as e:
         print(f"Error fetching job details from {url}: {e}")
@@ -84,12 +108,9 @@ def get_internships(position, experience, city, start_page=1, end_page=1):
             response = requests.get(page_url, headers=headers, timeout=15)
             response.raise_for_status()
             soup = BeautifulSoup(response.content, 'html.parser')
-            main_content = soup.find("div", class_="individual_internship")
-            if not main_content:
-                skipped_pages.append(current_page)
-                current_page += 1
-                continue
-            internships = soup.find_all("div", class_="individual_internship")
+            
+            internships = soup.find_all("div", class_=["individual_internship", "internship_meta"])
+
             if not internships:
                 consecutive_empty_pages += 1
                 current_page += 1
@@ -98,7 +119,13 @@ def get_internships(position, experience, city, start_page=1, end_page=1):
                 consecutive_empty_pages = 0
             for internship in internships:
                 try:
-                    position_tag = internship.find("a", id="job_title")
+                    position_tag = internship.find("h3", class_="profile") or internship.find("div", class_="heading_4_5")
+                    if position_tag:
+                        position_tag = position_tag.find("a")
+                    
+                    if not position_tag:
+                        position_tag = internship.find("a", {"id" :"job_title"})
+
                     if not position_tag:
                         continue
                     position_text = position_tag.get_text(strip=True)
