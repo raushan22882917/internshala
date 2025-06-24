@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internshala Scraper UI</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: linear-gradient(120deg, #e0e7ff 0%, #f7f7f7 100%); margin: 0; padding: 0; }
+        .container { max-width: 750px; margin: 48px auto; background: #fff; padding: 36px 48px; border-radius: 18px; box-shadow: 0 6px 32px rgba(45,108,223,0.10), 0 1.5px 6px rgba(0,0,0,0.04); }
+        h1 { text-align: center; color: #2d6cdf; font-size: 2.5rem; letter-spacing: 1px; margin-bottom: 32px; }
+        form { display: grid; grid-template-columns: 1fr 2fr; gap: 18px 24px; align-items: center; margin-bottom: 28px; }
+        label { font-weight: 500; color: #2d6cdf; }
+        input, select { padding: 10px 12px; border: 1.5px solid #b6c6e6; border-radius: 6px; font-size: 1rem; background: #f8faff; transition: border 0.2s; }
+        input:focus, select:focus { border: 1.5px solid #2d6cdf; outline: none; background: #eaf1ff; }
+        button { padding: 12px 28px; background: linear-gradient(90deg, #2d6cdf 60%, #4f8cff 100%); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 1.08rem; font-weight: 500; box-shadow: 0 2px 8px rgba(45,108,223,0.08); transition: background 0.2s, transform 0.1s; }
+        button:hover, button:focus { background: linear-gradient(90deg, #1b4e9b 60%, #2d6cdf 100%); transform: translateY(-2px) scale(1.03); }
+        .download-btn { margin-left: 12px; background: linear-gradient(90deg, #4f8cff 60%, #2d6cdf 100%); }
+        .results { margin-top: 36px; }
+        .job-card { background: #f1f6fd; margin-bottom: 20px; padding: 22px 24px; border-radius: 10px; box-shadow: 0 2px 8px rgba(45,108,223,0.07); transition: box-shadow 0.2s, transform 0.1s; position: relative; }
+        .job-card:hover { box-shadow: 0 6px 24px rgba(45,108,223,0.13); transform: translateY(-2px) scale(1.01); }
+        .job-title { font-weight: bold; color: #2d6cdf; font-size: 1.25rem; margin-bottom: 2px; }
+        .company { color: #444; font-size: 1.08rem; margin-bottom: 6px; }
+        .skills { margin-top: 8px; }
+        .skills span { background: #e3eefd; color: #2d6cdf; padding: 3px 10px; border-radius: 4px; margin-right: 7px; font-size: 1em; display: inline-block; margin-bottom: 3px; }
+        .error { color: #c00; margin-top: 12px; font-weight: 500; }
+        .success { color: #080; margin-top: 12px; font-weight: 500; }
+        #message { min-height: 28px; font-size: 1.08rem; margin-bottom: 8px; text-align: center; }
+        @media (max-width: 700px) {
+            .container { padding: 18px 6vw; }
+            form { grid-template-columns: 1fr; gap: 14px; }
+            button, .download-btn { width: 100%; margin: 0 0 8px 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Internshala Scraper</h1>
+        <form id="searchForm">
+            <label for="position">Position:</label>
+            <input type="text" id="position" name="position" placeholder="e.g. python">
+
+            <label for="experience">Experience:</label>
+            <input type="text" id="experience" name="experience" placeholder="e.g. 0, 1, 2">
+
+            <label for="city">City:</label>
+            <input type="text" id="city" name="city" placeholder="e.g. delhi">
+
+            <label for="start_page">Start Page:</label>
+            <input type="number" id="start_page" name="start_page" min="1" value="1">
+
+            <label for="end_page">End Page:</label>
+            <input type="number" id="end_page" name="end_page" min="1" value="1">
+
+            <label for="search_type">Type:</label>
+            <select id="search_type" name="search_type">
+                <option value="internship">Internship</option>
+                <option value="job">Job</option>
+            </select>
+
+            <button type="submit">Search</button>
+            <button type="button" id="downloadBtn" class="download-btn">Download CSV</button>
+        </form>
+        <div id="message"></div>
+        <div class="results" id="results"></div>
+    </div>
+    <script>
+        const apiBase = 'http://localhost:8000';
+        const form = document.getElementById('searchForm');
+        const resultsDiv = document.getElementById('results');
+        const messageDiv = document.getElementById('message');
+        const downloadBtn = document.getElementById('downloadBtn');
+        let lastParams = {};
+        let lastResults = [];
+
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            resultsDiv.innerHTML = '';
+            messageDiv.textContent = '';
+            const formData = new FormData(form);
+            const params = {
+                position: formData.get('position'),
+                experience: formData.get('experience'),
+                city: formData.get('city'),
+                start_page: formData.get('start_page'),
+                end_page: formData.get('end_page'),
+                search_type: formData.get('search_type')
+            };
+            lastParams = params;
+            let query = Object.entries(params)
+                .filter(([k, v]) => v && v !== '')
+                .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+                .join('&');
+            messageDiv.textContent = 'Searching...';
+            try {
+                const res = await fetch(`${apiBase}/search?${query}`);
+                const data = await res.json();
+                if (res.status !== 200 && data.error) {
+                    messageDiv.textContent = data.error;
+                    resultsDiv.innerHTML = '';
+                    lastResults = [];
+                    return;
+                }
+                if (data.results && data.results.length > 0) {
+                    let skipMsg = '';
+                    if (data.skipped_pages && data.skipped_pages.length > 0) {
+                        skipMsg = `Skipped pages: ${data.skipped_pages.join(', ')} (not available). `;
+                    }
+                    messageDiv.textContent = `${skipMsg}Found ${data.results.length} results (pages processed: ${data.pages_processed})`;
+                    renderResults(data.results);
+                    lastResults = data.results;
+                } else {
+                    messageDiv.textContent = 'No results found.';
+                    resultsDiv.innerHTML = '';
+                    lastResults = [];
+                }
+            } catch (err) {
+                messageDiv.textContent = 'Error fetching results.';
+                lastResults = [];
+            }
+        });
+
+        downloadBtn.addEventListener('click', function() {
+            if (!lastResults || lastResults.length === 0) {
+                messageDiv.textContent = 'Please search first before downloading.';
+                return;
+            }
+            const csv = convertToCSV(lastResults);
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'results.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        function convertToCSV(arr) {
+            if (!arr.length) return '';
+            const keys = Object.keys(arr[0]);
+            const escape = v => '"' + String(v).replace(/"/g, '""') + '"';
+            const header = keys.join(',');
+            const rows = arr.map(obj => keys.map(k => escape(obj[k] ?? '')).join(','));
+            return header + '\n' + rows.join('\n');
+        }
+
+        function renderResults(results) {
+            resultsDiv.innerHTML = '';
+            results.forEach(job => {
+                const card = document.createElement('div');
+                card.className = 'job-card';
+                card.innerHTML = `
+                    <div class="job-title">${job.position || ''}</div>
+                    <div class="company">${job.company || ''}</div>
+                    <div>Experience: ${job.experience !== undefined ? job.experience : 'N/A'}</div>
+                    ${job.salary ? `<div>Salary: ${job.salary}</div>` : ''}
+                    <div>URL: <a href="${job.url}" target="_blank">View</a></div>
+                    <div class="skills">Skills: ${job.required_skills && job.required_skills.length > 0 ? job.required_skills.map(s => `<span>${s}</span>`).join('') : 'N/A'}</div>
+                    <button onclick="fetchJobDetails('${job.url.replace(/'/g, '%27')}')">Refresh Skills</button>
+                `;
+                resultsDiv.appendChild(card);
+            });
+        }
+
+        window.fetchJobDetails = async function(url) {
+            messageDiv.textContent = 'Fetching job details...';
+            try {
+                const res = await fetch(`${apiBase}/job-details?url=${encodeURIComponent(url)}`);
+                const data = await res.json();
+                if (data.success) {
+                    messageDiv.textContent = 'Skills updated!';
+                    // Find the card and update skills
+                    const cards = document.querySelectorAll('.job-card');
+                    cards.forEach(card => {
+                        if (card.innerHTML.includes(url)) {
+                            const skillsDiv = card.querySelector('.skills');
+                            skillsDiv.innerHTML = 'Skills: ' + (data.required_skills.length > 0 ? data.required_skills.map(s => `<span>${s}</span>`).join('') : 'N/A');
+                        }
+                    });
+                } else {
+                    messageDiv.textContent = 'Failed to fetch job details.';
+                }
+            } catch (err) {
+                messageDiv.textContent = 'Error fetching job details.';
+            }
+        }
+    </script>
+</body>
+</html> 

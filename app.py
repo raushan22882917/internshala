@@ -55,12 +55,9 @@ def get_job_details(url):
             "required_skills": []
         }
 
-def get_internships(position, experience, city, max_pages=1):
+def get_internships(position, experience, city, start_page=1, end_page=1):
     """Fetch internships using BeautifulSoup"""
-    # Format the URL with user inputs
     base_url = "https://internshala.com"
-    
-    # Build URL based on available parameters
     if position and city:
         url = f"{base_url}/internships/{position}-internship-in-{city}/"
     elif position:
@@ -68,103 +65,57 @@ def get_internships(position, experience, city, max_pages=1):
     elif city:
         url = f"{base_url}/internships/internship-in-{city}/"
     else:
-        # If no parameters, search all internships
         url = f"{base_url}/internships/"
-    
     all_data = []
-    seen_urls = set()  # Track seen URLs to avoid duplicates
-    current_page = 1
-    consecutive_empty_pages = 0  # Track consecutive empty pages
-    max_consecutive_empty = 3  # Stop after 3 consecutive empty pages
-    
-    print(f"Searching for internships at: {url}")
-    print(f"Max pages to search: {'All available' if max_pages == 0 else max_pages}")
-    
+    seen_urls = set()
+    consecutive_empty_pages = 0
+    max_consecutive_empty = 3
+    skipped_pages = []
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
-    
-    while consecutive_empty_pages < max_consecutive_empty:
-        # Check if we've reached the max pages limit
-        if max_pages > 0 and current_page > max_pages:
-            print(f"Reached maximum pages limit ({max_pages})")
-            break
-            
+    current_page = start_page
+    while consecutive_empty_pages < max_consecutive_empty and current_page <= end_page:
         try:
-            # Add page parameter to URL only if max_pages is specified
-            if max_pages > 0 and current_page > 1:
-                page_url = f"{url}page-{current_page}/"
-            else:
-                page_url = url
-                
-            print(f"Fetching page {current_page}...")
-            
-            # Add random delay to be respectful to the server
+            page_url = url if current_page == 1 else f"{url}page-{current_page}/"
             if current_page > 1:
                 time.sleep(random.uniform(1, 3))
-            
-            # Make request
             response = requests.get(page_url, headers=headers, timeout=15)
             response.raise_for_status()
-            
-            # Parse with BeautifulSoup
             soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # Check if we're on a valid page by looking for the main content
             main_content = soup.find("div", class_="individual_internship")
             if not main_content:
-                print(f"No internship data found on page {current_page}. Stopping search.")
-                break
-            
-            # Extract data
+                skipped_pages.append(current_page)
+                current_page += 1
+                continue
             internships = soup.find_all("div", class_="individual_internship")
-            
-            if not internships:  # No more jobs found on this page
+            if not internships:
                 consecutive_empty_pages += 1
-                print(f"No internships found on page {current_page}")
                 current_page += 1
                 continue
             else:
-                consecutive_empty_pages = 0  # Reset counter if we found jobs
-                print(f"Found {len(internships)} internships on page {current_page}")
-                
-            page_jobs_count = 0  # Track jobs added from this page
-            
+                consecutive_empty_pages = 0
             for internship in internships:
                 try:
-                    # Position
                     position_tag = internship.find("a", id="job_title")
                     if not position_tag:
                         continue
-                        
                     position_text = position_tag.get_text(strip=True)
                     job_url = base_url + position_tag.get("href") if position_tag.get("href") else None
-                    
-                    # Skip if no URL or if we've seen this URL before
                     if not job_url or job_url in seen_urls:
                         continue
-                    
-                    seen_urls.add(job_url)  # Mark URL as seen
-
-                    # Company
+                    seen_urls.add(job_url)
                     company_tag = internship.find("p", class_="company-name")
                     company = company_tag.get_text(strip=True) if company_tag else "N/A"
-
-                    # Experience
                     experience_div = internship.find("div", class_="row-1-item")
                     experience_span = experience_div.find("span") if experience_div else None
                     experience_text = experience_span.get_text(strip=True) if experience_span else "N/A"
-                    
-                    # Extract number from experience text
                     experience_years = 0
                     if experience_text != "N/A":
                         match = re.search(r'(\d+)', experience_text)
                         if match:
                             experience_years = int(match.group(1))
-
-                    # Get additional job details
                     job_details = get_job_details(job_url)
-
                     job_data = {
                         "position": position_text,
                         "company": company,
@@ -172,50 +123,20 @@ def get_internships(position, experience, city, max_pages=1):
                         "experience": experience_years,
                         "required_skills": job_details.get("required_skills", [])
                     }
-                    
-                    # Only add if we have valid data
                     if position_text != "N/A" and company != "N/A":
                         all_data.append(job_data)
-                        page_jobs_count += 1
-                        print(f"Added: {position_text} at {company}")
-                    
                 except Exception as e:
-                    print(f"Skipping job due to error: {e}")
                     continue
-            
-            print(f"Added {page_jobs_count} jobs from page {current_page}")
-            
-            # If we didn't add any jobs from this page, increment empty counter
-            if page_jobs_count == 0:
-                consecutive_empty_pages += 1
-                print(f"No valid jobs found on page {current_page}. Stopping search.")
-                break
-            
-            # If max_pages is 0, only fetch first page
-            if max_pages == 0:
-                print("No page count specified. Only fetching first page.")
-                break
-                
             current_page += 1
-            
         except Exception as e:
-            print(f"Error fetching page {current_page}: {e}")
-            consecutive_empty_pages += 1
+            skipped_pages.append(current_page)
             current_page += 1
-    
-    pages_processed = current_page - 1
-    print(f"\nTotal internships found: {len(all_data)}")
-    print(f"Total pages processed: {pages_processed}")
-    print(f"Unique URLs processed: {len(seen_urls)}")
-    
-    return all_data, pages_processed
+    pages_processed = current_page - start_page
+    return all_data, pages_processed, skipped_pages
 
-def get_jobs(position, experience, city, max_pages=1):
+def get_jobs(position, experience, city, start_page=1, end_page=1):
     """Fetch jobs using BeautifulSoup"""
-    # Format the URL with user inputs
     base_url = "https://internshala.com"
-    
-    # Build URL based on available parameters
     if position and city:
         url = f"{base_url}/jobs/{position}-jobs-in-{city}/"
     elif position:
@@ -223,134 +144,76 @@ def get_jobs(position, experience, city, max_pages=1):
     elif city:
         url = f"{base_url}/jobs/jobs-in-{city}/"
     else:
-        # If no parameters, search all jobs
         url = f"{base_url}/jobs/"
-    
     all_data = []
-    seen_urls = set()  # Track seen URLs to avoid duplicates
-    current_page = 1
-    consecutive_empty_pages = 0  # Track consecutive empty pages
-    max_consecutive_empty = 3  # Stop after 3 consecutive empty pages
-    
-    print(f"Searching for jobs at: {url}")
-    print(f"Max pages to search: {'All available' if max_pages == 0 else max_pages}")
-    
+    seen_urls = set()
+    consecutive_empty_pages = 0
+    max_consecutive_empty = 3
+    skipped_pages = []
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
-    
-    while consecutive_empty_pages < max_consecutive_empty:
-        # Check if we've reached the max pages limit
-        if max_pages > 0 and current_page > max_pages:
-            print(f"Reached maximum pages limit ({max_pages})")
-            break
-            
+    current_page = start_page
+    while consecutive_empty_pages < max_consecutive_empty and current_page <= end_page:
         try:
-            # Add page parameter to URL only if max_pages is specified
-            if max_pages > 0 and current_page > 1:
-                page_url = f"{url}page-{current_page}/"
-            else:
-                page_url = url
-                
-            print(f"Fetching page {current_page}...")
-            
-            # Add random delay to be respectful to the server
+            page_url = url if current_page == 1 else f"{url}page-{current_page}/"
             if current_page > 1:
                 time.sleep(random.uniform(1, 3))
-            
-            # Make request
             response = requests.get(page_url, headers=headers, timeout=15)
             response.raise_for_status()
-            
-            # Parse with BeautifulSoup
             soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # For jobs, look for job listings - the structure might be different
-            # Try different selectors that might contain job listings
             job_selectors = [
-                "div.job_listing",  # Common job listing selector
-                "div.individual_job",  # Alternative selector
-                "div.job-card",  # Another possible selector
-                "div[class*='job']",  # Any div with 'job' in class name
-                "div[class*='listing']"  # Any div with 'listing' in class name
+                "div.job_listing",
+                "div.individual_job",
+                "div.job-card",
+                "div[class*='job']",
+                "div[class*='listing']"
             ]
-            
             jobs = []
             for selector in job_selectors:
                 jobs = soup.find_all("div", class_=selector.replace("div.", ""))
                 if jobs:
-                    print(f"Found jobs using selector: {selector}")
                     break
-            
-            # If no jobs found with specific selectors, try a more generic approach
             if not jobs:
-                # Look for any div that might contain job information
                 potential_jobs = soup.find_all("div", class_=lambda x: x and any(word in x.lower() for word in ['job', 'listing', 'card', 'item']))
                 if potential_jobs:
                     jobs = potential_jobs
-                    print(f"Found {len(jobs)} potential job listings using generic selector")
-            
-            if not jobs:  # No more jobs found on this page
+            if not jobs:
                 consecutive_empty_pages += 1
-                print(f"No jobs found on page {current_page}")
                 current_page += 1
                 continue
             else:
-                consecutive_empty_pages = 0  # Reset counter if we found jobs
-                print(f"Found {len(jobs)} jobs on page {current_page}")
-                
-            page_jobs_count = 0  # Track jobs added from this page
-            
+                consecutive_empty_pages = 0
             for job in jobs:
                 try:
-                    # Try to extract job information
-                    # Position/Title
                     position_tag = job.find("a") or job.find("h3") or job.find("h2") or job.find("div", class_="title")
                     if not position_tag:
                         continue
-                        
                     position_text = position_tag.get_text(strip=True)
                     if not position_text:
                         continue
-                    
-                    # Get job URL
                     job_url = None
                     if position_tag.name == "a" and position_tag.get("href"):
                         job_url = base_url + position_tag.get("href") if not position_tag.get("href").startswith("http") else position_tag.get("href")
                     else:
-                        # Try to find a link within the job card
                         link_tag = job.find("a")
                         if link_tag and link_tag.get("href"):
                             job_url = base_url + link_tag.get("href") if not link_tag.get("href").startswith("http") else link_tag.get("href")
-                    
-                    # Skip if no URL or if we've seen this URL before
                     if not job_url or job_url in seen_urls:
                         continue
-                    
-                    seen_urls.add(job_url)  # Mark URL as seen
-
-                    # Company
+                    seen_urls.add(job_url)
                     company_tag = job.find("div", class_="company") or job.find("span", class_="company") or job.find("p", class_="company")
                     company = company_tag.get_text(strip=True) if company_tag else "N/A"
-
-                    # Salary (for jobs)
                     salary_tag = job.find("div", class_="salary") or job.find("span", class_="salary") or job.find("div", class_=lambda x: x and "salary" in x.lower())
                     salary = salary_tag.get_text(strip=True) if salary_tag else "Not specified"
-
-                    # Experience
                     experience_tag = job.find("div", class_="experience") or job.find("span", class_="experience") or job.find("div", class_=lambda x: x and "experience" in x.lower())
                     experience_text = experience_tag.get_text(strip=True) if experience_tag else "N/A"
-                    
-                    # Extract number from experience text
                     experience_years = 0
                     if experience_text != "N/A":
                         match = re.search(r'(\d+)', experience_text)
                         if match:
                             experience_years = int(match.group(1))
-
-                    # Get additional job details
                     job_details = get_job_details(job_url)
-
                     job_data = {
                         "position": position_text,
                         "company": company,
@@ -359,66 +222,40 @@ def get_jobs(position, experience, city, max_pages=1):
                         "salary": salary,
                         "required_skills": job_details.get("required_skills", [])
                     }
-                    
-                    # Only add if we have valid data
                     if position_text != "N/A" and company != "N/A":
                         all_data.append(job_data)
-                        page_jobs_count += 1
-                        print(f"Added: {position_text} at {company}")
-                    
                 except Exception as e:
-                    print(f"Skipping job due to error: {e}")
                     continue
-            
-            print(f"Added {page_jobs_count} jobs from page {current_page}")
-            
-            # If we didn't add any jobs from this page, increment empty counter
-            if page_jobs_count == 0:
-                consecutive_empty_pages += 1
-                print(f"No valid jobs found on page {current_page}. Stopping search.")
-                break
-            
-            # If max_pages is 0, only fetch first page
-            if max_pages == 0:
-                print("No page count specified. Only fetching first page.")
-                break
-                
             current_page += 1
-            
         except Exception as e:
-            print(f"Error fetching page {current_page}: {e}")
-            consecutive_empty_pages += 1
+            skipped_pages.append(current_page)
             current_page += 1
-    
-    pages_processed = current_page - 1
-    print(f"\nTotal jobs found: {len(all_data)}")
-    print(f"Total pages processed: {pages_processed}")
-    print(f"Unique URLs processed: {len(seen_urls)}")
-    
-    return all_data, pages_processed
+    pages_processed = current_page - start_page
+    return all_data, pages_processed, skipped_pages
 
 @app.get('/search')
 def search(
     position: Optional[str] = Query(None),
     experience: Optional[str] = Query(None),
     city: Optional[str] = Query(None),
-    max_pages: int = Query(1),
+    start_page: int = Query(1),
+    end_page: int = Query(1),
     search_type: str = Query('internship', enum=['internship', 'job'])
 ):
-    # Run the appropriate search based on type
     if search_type == 'job':
-        results, pages_processed = get_jobs(position, experience, city, max_pages)
+        results, pages_processed, skipped_pages = get_jobs(position, experience, city, start_page, end_page)
     else:
-        results, pages_processed = get_internships(position, experience, city, max_pages)
-    
+        results, pages_processed, skipped_pages = get_internships(position, experience, city, start_page, end_page)
     return {
         'results': results,
         'pages_processed': pages_processed,
+        'skipped_pages': skipped_pages,
         'search_params': {
             'position': position,
             'experience': experience,
             'city': city,
-            'max_pages': max_pages,
+            'start_page': start_page,
+            'end_page': end_page,
             'search_type': search_type
         }
     }
@@ -438,26 +275,22 @@ def job_details(url: str = Query(...)):
     except Exception as e:
         return JSONResponse(content={'error': str(e)}, status_code=500)
 
-@app.get('/download_excel')
-def download_excel(
+@app.get('/download_csv')
+def download_csv(
     position: Optional[str] = Query(None),
     experience: Optional[str] = Query(None),
     city: Optional[str] = Query(None),
-    max_pages: int = Query(1),
+    start_page: int = Query(1),
+    end_page: int = Query(1),
     search_type: str = Query('internship', enum=['internship', 'job'])
 ):
-    # Run the appropriate search based on type
     if search_type == 'job':
-        results, _ = get_jobs(position, experience, city, max_pages)
+        results, _ = get_jobs(position, experience, city, start_page, end_page)
     else:
-        results, _ = get_internships(position, experience, city, max_pages)
-    
+        results, _ = get_internships(position, experience, city, start_page, end_page)
     if not results:
         return JSONResponse(content={'error': 'No results to download for the given criteria'}, status_code=404)
-
     df = pd.DataFrame(results)
-    
-    # Create filename with search parameters
     filename_parts = []
     if position:
         filename_parts.append(position)
@@ -465,20 +298,16 @@ def download_excel(
         filename_parts.append(city)
     if not filename_parts:
         filename_parts.append("all")
-    
-    excel_filename = f"{search_type}_{'_'.join(filename_parts)}.xlsx"
-
-    output = io.BytesIO()
-    df.to_excel(output, index=False)
+    csv_filename = f"{search_type}_{'_'.join(filename_parts)}.csv"
+    output = io.StringIO()
+    df.to_csv(output, index=False)
     output.seek(0)
-
     headers = {
-        'Content-Disposition': f'attachment; filename="{excel_filename}"'
+        'Content-Disposition': f'attachment; filename="{csv_filename}"'
     }
-    
     return Response(
-        content=output.getvalue(), 
-        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        content=output.getvalue(),
+        media_type='text/csv',
         headers=headers
     )
 
