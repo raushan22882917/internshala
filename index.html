@@ -25,6 +25,37 @@
         .error { color: #c00; margin-top: 12px; font-weight: 500; }
         .success { color: #080; margin-top: 12px; font-weight: 500; }
         #message { min-height: 28px; font-size: 1.08rem; margin-bottom: 8px; text-align: center; }
+        .loader-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .loader {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #2d6cdf;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+        }
+        #loader-message {
+            margin-top: 20px;
+            font-size: 1.2em;
+            color: #2d6cdf;
+            font-weight: 500;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
         @media (max-width: 700px) {
             .container { padding: 18px 6vw; }
             form { grid-template-columns: 1fr; gap: 14px; }
@@ -63,14 +94,29 @@
         <div id="message"></div>
         <div class="results" id="results"></div>
     </div>
+    <div id="loader-overlay" class="loader-overlay">
+        <div class="loader"></div>
+        <p id="loader-message"></p>
+    </div>
     <script>
-        const apiBase = 'http://localhost:8000';
+        const apiBase = 'http://127.0.0.1:8000';
         const form = document.getElementById('searchForm');
         const resultsDiv = document.getElementById('results');
         const messageDiv = document.getElementById('message');
         const downloadBtn = document.getElementById('downloadBtn');
+        const loaderOverlay = document.getElementById('loader-overlay');
+        const loaderMessage = document.getElementById('loader-message');
         let lastParams = {};
         let lastResults = [];
+
+        function showLoader(message = 'Searching...') {
+            loaderMessage.textContent = message;
+            loaderOverlay.style.display = 'flex';
+        }
+
+        function hideLoader() {
+            loaderOverlay.style.display = 'none';
+        }
 
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -90,7 +136,9 @@
                 .filter(([k, v]) => v && v !== '')
                 .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
                 .join('&');
-            messageDiv.textContent = 'Searching...';
+            
+            showLoader(`Scraping pages ${params.start_page} to ${params.end_page}...`);
+
             try {
                 const res = await fetch(`${apiBase}/search?${query}`);
                 const data = await res.json();
@@ -116,6 +164,8 @@
             } catch (err) {
                 messageDiv.textContent = 'Error fetching results.';
                 lastResults = [];
+            } finally {
+                hideLoader();
             }
         });
 
@@ -164,7 +214,7 @@
         }
 
         window.fetchJobDetails = async function(url) {
-            messageDiv.textContent = 'Fetching job details...';
+            showLoader('Fetching job details...');
             try {
                 const res = await fetch(`${apiBase}/job-details?url=${encodeURIComponent(url)}`);
                 const data = await res.json();
@@ -183,6 +233,8 @@
                 }
             } catch (err) {
                 messageDiv.textContent = 'Error fetching job details.';
+            } finally {
+                hideLoader();
             }
         }
     </script>
