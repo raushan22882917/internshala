@@ -12,6 +12,7 @@ import uvicorn
 from typing import Optional
 import io
 from fastapi.middleware.cors import CORSMiddleware
+import urllib.parse
 
 app = FastAPI()
 
@@ -101,7 +102,14 @@ def get_internships(position, experience, city, start_page=1, end_page=1):
                     if not position_tag:
                         continue
                     position_text = position_tag.get_text(strip=True)
-                    job_url = base_url + position_tag.get("href") if position_tag.get("href") else None
+                    href = position_tag.get("href")
+                    if href:
+                        if href.startswith("http"):
+                            job_url = href
+                        else:
+                            job_url = urllib.parse.urljoin(base_url, href)
+                    else:
+                        job_url = None
                     if not job_url or job_url in seen_urls:
                         continue
                     seen_urls.add(job_url)
@@ -194,11 +202,19 @@ def get_jobs(position, experience, city, start_page=1, end_page=1):
                         continue
                     job_url = None
                     if position_tag.name == "a" and position_tag.get("href"):
-                        job_url = base_url + position_tag.get("href") if not position_tag.get("href").startswith("http") else position_tag.get("href")
+                        href = position_tag.get("href")
+                        if href.startswith("http"):
+                            job_url = href
+                        else:
+                            job_url = urllib.parse.urljoin(base_url, href)
                     else:
                         link_tag = job.find("a")
                         if link_tag and link_tag.get("href"):
-                            job_url = base_url + link_tag.get("href") if not link_tag.get("href").startswith("http") else link_tag.get("href")
+                            href = link_tag.get("href")
+                            if href.startswith("http"):
+                                job_url = href
+                            else:
+                                job_url = urllib.parse.urljoin(base_url, href)
                     if not job_url or job_url in seen_urls:
                         continue
                     seen_urls.add(job_url)
